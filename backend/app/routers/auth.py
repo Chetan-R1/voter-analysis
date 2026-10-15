@@ -23,8 +23,8 @@ def login(body: LoginBody, response: Response, db: Session = Depends(get_db)):
         key="access_token",
         value=token,
         httponly=True,
-        samesite="lax",
-        secure=False,   # set True in production with HTTPS
+        samesite="none",
+        secure=True,
         max_age=60 * 60 * 8,
     )
     return {"ok": True}
