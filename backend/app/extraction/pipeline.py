@@ -6,7 +6,6 @@ verify the counts. Everything suspicious ends up in `issues` for human review.
 """
 
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -107,15 +106,18 @@ def _check_counts(result: ExtractionResult) -> None:
 def extract_pdf(path: Path, sha256: str | None = None) -> ExtractionResult:
     s = get_settings()
     sha256 = sha256 or file_sha256(path)
-    images = render_pages(path, s.render_dpi)
     texts = page_texts(path)
-    n = len(images)
+    n = len(texts)
 
-    with ThreadPoolExecutor(max_workers=s.llm_workers) as pool:
-        pages = list(pool.map(
-            lambda i: extract_page(images[i], i + 1, n, f"{sha256[:16]}-{s.render_dpi}dpi-p{i + 1}"),
-            range(n),
-        ))
+    # Process one page at a time to keep memory low on free-tier hosts
+    pages = []
+    import pymupdf
+    with pymupdf.open(path) as doc:
+        for i, pdf_page in enumerate(doc):
+            image_png = pdf_page.get_pixmap(dpi=s.render_dpi).tobytes("png")
+            page = extract_page(image_png, i + 1, n, f"{sha256[:16]}-{s.render_dpi}dpi-p{i + 1}")
+            pages.append(page)
+            del image_png  # free memory immediately
 
     result = ExtractionResult(
         sha256=sha256,

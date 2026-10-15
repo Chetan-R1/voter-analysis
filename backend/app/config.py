@@ -22,15 +22,15 @@ class Settings(BaseSettings):
         return v
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-3.8-flash"
+    gemini_model: str = "gemini-2.0-flash"
 
     r2_account_id: str = ""
     r2_access_key_id: str = ""
     r2_secret_access_key: str = ""
     r2_bucket: str = "voter-pdfs"
 
-    render_dpi: int = 200
-    llm_workers: int = 4
+    render_dpi: int = 150
+    llm_workers: int = 1
     llm_cache_dir: Path = BACKEND_DIR / ".cache" / "llm"
 
 
