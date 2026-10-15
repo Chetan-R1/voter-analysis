@@ -38,11 +38,7 @@ Rules:
 - Leave unrelated fields null / empty lists.
 """
 
-FALLBACK_MODELS = [
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-]
+FALLBACK_MODELS: list[str] = []  # gemini-2.0-flash and older are deprecated
 
 JSON_PROMPT = """\
 Respond with a single JSON object matching this TypeScript type exactly:
@@ -121,9 +117,10 @@ def extract_page(image_png: bytes, page_no: int, total_pages: int, cache_key: st
                     time.sleep(wait)
                     continue
                 elif "404" in err or "NOT_FOUND" in err:
-                    print(f"[page {page_no}] {model} not available, trying next...")
+                    print(f"[page {page_no}] {model} 404: {err[:300]}")
                     break
                 else:
+                    print(f"[page {page_no}] {model} unexpected error: {err[:300]}")
                     raise
 
     raise RuntimeError(f"All models failed for page {page_no}: {last_error}")

@@ -22,7 +22,7 @@ class Settings(BaseSettings):
         return v
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-3.8-flash"
 
     r2_account_id: str = ""
     r2_access_key_id: str = ""
