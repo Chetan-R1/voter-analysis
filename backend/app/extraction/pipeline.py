@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.config import get_settings
-from app.extraction.llm import extract_page
-from app.extraction.pdf_utils import file_sha256, page_texts, render_pages
+from app.extraction.llm import extract_pdf_direct
+from app.extraction.pdf_utils import file_sha256, page_texts
 from app.extraction.schemas import CoverInfo, SummaryInfo, VoterEntry
 from app.extraction.text_layer import TextRecord, normalize_digits, parse_voter_page
 
@@ -109,15 +109,8 @@ def extract_pdf(path: Path, sha256: str | None = None) -> ExtractionResult:
     texts = page_texts(path)
     n = len(texts)
 
-    # Process one page at a time to keep memory low on free-tier hosts
-    pages = []
-    import pymupdf
-    with pymupdf.open(path) as doc:
-        for i, pdf_page in enumerate(doc):
-            image_png = pdf_page.get_pixmap(dpi=s.render_dpi).tobytes("png")
-            page = extract_page(image_png, i + 1, n, f"{sha256[:16]}-{s.render_dpi}dpi-p{i + 1}")
-            pages.append(page)
-            del image_png  # free memory immediately
+    # Send whole PDF to Gemini in one call — no image conversion needed
+    pages = extract_pdf_direct(path, sha256[:16])
 
     result = ExtractionResult(
         sha256=sha256,
