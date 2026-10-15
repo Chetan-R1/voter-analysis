@@ -9,9 +9,17 @@ from app.routers import auth, booths, imports, search, voters
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from app.models import Base
-    from app.db import engine
+    from app.models import Base, PdfImport
+    from app.db import engine, SessionLocal
     Base.metadata.create_all(bind=engine)
+    # Reset imports stuck in "processing" from a previous crashed run
+    with SessionLocal() as db:
+        stuck = db.query(PdfImport).filter(PdfImport.status == "processing").all()
+        for imp in stuck:
+            imp.status = "failed"
+            imp.errors = (imp.errors or []) + ["Server restarted during processing — please retry"]
+        if stuck:
+            db.commit()
     yield
 
 

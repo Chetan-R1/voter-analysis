@@ -256,7 +256,7 @@ def retry_import(
     imp = db.get(PdfImport, import_id)
     if not imp:
         raise HTTPException(status_code=404, detail="Import not found")
-    if imp.status not in ("failed", "review"):
+    if imp.status not in ("failed", "review", "processing", "uploaded"):
         raise HTTPException(status_code=400, detail=f"Cannot retry import with status '{imp.status}'")
 
     imp.status = "uploaded"
