@@ -41,7 +41,33 @@ Rules:
 FALLBACK_MODELS = [
     "gemini-2.0-flash-lite",
     "gemini-1.5-flash",
+    "gemini-1.5-pro",
 ]
+
+JSON_PROMPT = """\
+Respond with a single JSON object matching this TypeScript type exactly:
+
+{
+  page_type: "cover" | "map" | "voters" | "supplement" | "summary" | "other",
+  cover: CoverInfo | null,
+  voters: VoterEntry[],
+  additions: VoterEntry[],
+  deletions: DeletionEntry[],
+  summary: SummaryInfo | null
+}
+
+Where:
+CoverInfo = { district, panchayat_samiti, gram_panchayat, ward_no, tehsil, main_village,
+  assembly_constituency, zp_constituency, ps_constituency, booth_no, booth_name,
+  ward_boundary, first_serial, last_serial, male, female, third_gender, total }
+VoterEntry = { serial_no, epic_no, name, name_en, relative_name, relative_name_en,
+  relation_type: "father"|"husband"|"mother"|"other", house_no, age,
+  gender: "male"|"female"|"third", hamlet: string|null, deletion_mark: "E"|"S"|"R"|null }
+DeletionEntry = { serial_no, epic_no, code: "E"|"S"|"R" }
+SummaryInfo = { original_male, original_female, original_third, original_total,
+  added_total, deleted_total, final_male, final_female, final_third, final_total }
+
+Output raw JSON only — no markdown, no code fences."""
 
 
 def extract_page(image_png: bytes, page_no: int, total_pages: int, cache_key: str) -> PageExtraction:
@@ -66,21 +92,24 @@ def extract_page(image_png: bytes, page_no: int, total_pages: int, cache_key: st
                     model=model,
                     contents=[
                         types.Part.from_text(text=SYSTEM_PROMPT),
-                        types.Part.from_text(text=f"Page {page_no} of {total_pages}."),
+                        types.Part.from_text(text=f"Page {page_no} of {total_pages}. {JSON_PROMPT}"),
                         types.Part.from_bytes(data=image_png, mime_type="image/png"),
                     ],
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_schema=PageExtraction,
-                        temperature=0,
-                    ),
+                    config=types.GenerateContentConfig(temperature=0),
                 )
                 text = response.text
                 if not text:
                     raise RuntimeError(f"Model returned no output for page {page_no}")
-                result = PageExtraction.model_validate_json(text)
+                # Strip markdown fences if model added them
+                text = text.strip()
+                if text.startswith("```"):
+                    text = text.split("```")[1]
+                    if text.startswith("json"):
+                        text = text[4:]
+                result = PageExtraction.model_validate_json(text.strip())
                 cache_file.parent.mkdir(parents=True, exist_ok=True)
                 cache_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+                print(f"[page {page_no}] done with {model}")
                 return result
 
             except Exception as e:
