@@ -1,16 +1,14 @@
 import time
-from pathlib import Path
 
 from google import genai
 from google.genai import types
-from pydantic import BaseModel
 
 from app.config import get_settings
 from app.extraction.schemas import PageExtraction
 
 SYSTEM_PROMPT = """\
-You extract data from a Rajasthan State Election Commission panchayat electoral roll
-(पंचायत चुनाव निर्वाचक नामावली). The document is a PDF. Return data for EVERY page in order.
+You extract data from one page of a Rajasthan State Election Commission panchayat electoral roll
+(पंचायत चुनाव निर्वाचक नामावली). The page is an image. Return data that matches the schema exactly.
 
 Page types:
 - "cover": first page with district, panchayat samiti, gram panchayat, ward, booth, revision details
@@ -38,33 +36,25 @@ Rules:
   them on this page.
 - Ignore "Photo is Available" text and any DELETED watermark (but keep the E/S/R letter).
 - Leave unrelated fields null / empty lists.
-- Return one entry per page, in document order.
 """
 
 FALLBACK_MODELS = [
     "gemini-2.0-flash-lite",
     "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
 ]
 
 
-class DocumentExtraction(BaseModel):
-    pages: list[PageExtraction]
-
-
-def extract_pdf_direct(pdf_path: Path, cache_key: str) -> list[PageExtraction]:
-    """Send the whole PDF to Gemini in one call — fast, no image conversion."""
+def extract_page(image_png: bytes, page_no: int, total_pages: int, cache_key: str) -> PageExtraction:
+    """Run the vision model on one page image. Results are cached on disk."""
     s = get_settings()
-    cache_file = s.llm_cache_dir / f"{cache_key}-full.json"
+    cache_file = s.llm_cache_dir / f"{cache_key}.json"
     if cache_file.exists():
-        doc = DocumentExtraction.model_validate_json(cache_file.read_text(encoding="utf-8"))
-        return doc.pages
+        return PageExtraction.model_validate_json(cache_file.read_text(encoding="utf-8"))
 
     if not s.gemini_api_key:
         raise RuntimeError("GEMINI_API_KEY missing: set it in backend/.env")
 
     client = genai.Client(api_key=s.gemini_api_key)
-    pdf_bytes = pdf_path.read_bytes()
 
     models_to_try = [s.gemini_model] + [m for m in FALLBACK_MODELS if m != s.gemini_model]
     last_error: Exception | None = None
@@ -76,34 +66,35 @@ def extract_pdf_direct(pdf_path: Path, cache_key: str) -> list[PageExtraction]:
                     model=model,
                     contents=[
                         types.Part.from_text(text=SYSTEM_PROMPT),
-                        types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+                        types.Part.from_text(text=f"Page {page_no} of {total_pages}."),
+                        types.Part.from_bytes(data=image_png, mime_type="image/png"),
                     ],
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
-                        response_schema=DocumentExtraction,
+                        response_schema=PageExtraction,
                         temperature=0,
                     ),
                 )
                 text = response.text
                 if not text:
-                    raise RuntimeError("Model returned no output")
-                doc = DocumentExtraction.model_validate_json(text)
+                    raise RuntimeError(f"Model returned no output for page {page_no}")
+                result = PageExtraction.model_validate_json(text)
                 cache_file.parent.mkdir(parents=True, exist_ok=True)
-                cache_file.write_text(doc.model_dump_json(indent=2), encoding="utf-8")
-                print(f"[gemini] extracted {len(doc.pages)} pages with {model}")
-                return doc.pages
+                cache_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+                return result
 
             except Exception as e:
                 last_error = e
                 err = str(e)
                 if "503" in err or "UNAVAILABLE" in err:
                     wait = 15 * (2 ** attempt)
-                    print(f"[gemini] {model} 503, waiting {wait}s...")
+                    print(f"[page {page_no}] {model} 503, waiting {wait}s...")
                     time.sleep(wait)
                     continue
                 elif "404" in err or "NOT_FOUND" in err:
+                    print(f"[page {page_no}] {model} not available, trying next...")
                     break
                 else:
                     raise
 
-    raise RuntimeError(f"All models failed: {last_error}")
+    raise RuntimeError(f"All models failed for page {page_no}: {last_error}")
