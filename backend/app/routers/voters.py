@@ -86,8 +86,8 @@ def _infer_housemate_relation(voter: Voter, other: Voter) -> str:
     return "relative"
 
 
-@router.get("/{voter_id}/relationships")
-def get_voter_relationships(
+@router.get("/{voter_id}/family")
+def get_voter_family(
     voter_id: int,
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
@@ -99,58 +99,37 @@ def get_voter_relationships(
     result = []
     seen_ids: set[int] = {voter.id}
 
-    # Primary: same house number in same booth — most reliable family signal
+    # Primary: same house number — most reliable
     if voter.house_no:
-        housemates = (
-            db.query(Voter)
-            .filter(
-                Voter.booth_id == voter.booth_id,
-                Voter.house_no == voter.house_no,
-                Voter.status == "active",
-                Voter.id != voter.id,
-            )
-            .all()
-        )
-        for h in housemates:
+        for h in db.query(Voter).filter(
+            Voter.booth_id == voter.booth_id,
+            Voter.house_no == voter.house_no,
+            Voter.status == "active",
+            Voter.id != voter.id,
+        ).all():
             seen_ids.add(h.id)
-            relation = _infer_housemate_relation(voter, h)
-            result.append({"relation": relation, "confidence": 0.95, "voter": _voter_out(h)})
+            result.append({"relation": _infer_housemate_relation(voter, h), "confidence": 0.95, "voter": _voter_out(h)})
 
-    # Fallback: name matching for relatives possibly in a different house (e.g. parent registered elsewhere)
-    if voter.relative_name:
-        for p in (
-            db.query(Voter)
-            .filter(
-                Voter.booth_id == voter.booth_id,
-                Voter.status == "active",
-                Voter.id.not_in(seen_ids),
-            )
-            .all()
-        ):
+    # Fallback: parent in different house
+    if voter.relative_name and voter.relation_type in ("father", "mother"):
+        for p in db.query(Voter).filter(
+            Voter.booth_id == voter.booth_id,
+            Voter.status == "active",
+            Voter.id.not_in(seen_ids),
+        ).all():
             if _names_match(p.name, voter.relative_name):
                 seen_ids.add(p.id)
-                result.append({
-                    "relation": voter.relation_type or "relative",
-                    "confidence": 0.7,
-                    "voter": _voter_out(p),
-                })
+                result.append({"relation": voter.relation_type, "confidence": 0.55, "voter": _voter_out(p)})
 
+    # Children in different houses
     if voter.name:
-        for c in (
-            db.query(Voter)
-            .filter(
-                Voter.booth_id == voter.booth_id,
-                Voter.status == "active",
-                Voter.id.not_in(seen_ids),
-            )
-            .all()
-        ):
-            if _names_match(c.relative_name, voter.name):
+        for c in db.query(Voter).filter(
+            Voter.booth_id == voter.booth_id,
+            Voter.status == "active",
+            Voter.id.not_in(seen_ids),
+        ).all():
+            if _names_match(c.relative_name, voter.name) and c.relation_type in ("father", "mother"):
                 seen_ids.add(c.id)
-                result.append({
-                    "relation": _reverse_relation(c.relation_type or "", c.gender or ""),
-                    "confidence": 0.7,
-                    "voter": _voter_out(c),
-                })
+                result.append({"relation": _reverse_relation(c.relation_type, c.gender or ""), "confidence": 0.55, "voter": _voter_out(c)})
 
     return result

@@ -82,7 +82,7 @@ def extract_page(image_png: bytes, page_no: int, total_pages: int, cache_key: st
     last_error: Exception | None = None
 
     for model in models_to_try:
-        for attempt in range(4):
+        for attempt in range(8):
             try:
                 response = client.models.generate_content(
                     model=model,

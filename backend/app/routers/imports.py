@@ -27,6 +27,7 @@ def _r2_configured() -> bool:
 @router.post("/imports/presign")
 def presign_upload(
     file_name: str,
+    project_id: int,
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
 ):
@@ -40,7 +41,7 @@ def presign_upload(
     import uuid
     key = f"pdfs/{uuid.uuid4().hex[:12]}-{file_name}"
     url = storage.presigned_put_url(key, expires=900)
-    return {"upload_url": url, "key": key}
+    return {"upload_url": url, "key": key, "project_id": project_id}
 
 
 @router.post("/imports/register")
@@ -53,6 +54,7 @@ def register_upload(
     """Called after browser finishes uploading to R2. Registers import and starts extraction."""
     key: str = body.get("key", "")
     file_name: str = body.get("file_name", key.split("/")[-1])
+    project_id: int | None = body.get("project_id")
 
     if not key:
         raise HTTPException(status_code=400, detail="key required")
@@ -61,7 +63,7 @@ def register_upload(
     if existing:
         return {"id": existing.id, "skipped": True}
 
-    imp = PdfImport(r2_key=key, file_name=file_name, sha256="")
+    imp = PdfImport(project_id=project_id, r2_key=key, file_name=file_name, sha256="")
     db.add(imp); db.commit(); db.refresh(imp)
     background_tasks.add_task(_run_import, imp.id)
     return {"id": imp.id, "file_name": file_name, "status": imp.status, "skipped": False}
@@ -81,6 +83,7 @@ def _run_import(import_id: int):
 @router.post("/imports/upload")
 async def upload_pdf(
     background_tasks: BackgroundTasks,
+    project_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
@@ -117,7 +120,7 @@ async def upload_pdf(
         storage.upload_file(tmp_path, key)
         tmp_path.unlink(missing_ok=True)
 
-        imp = PdfImport(r2_key=key, file_name=file.filename, sha256=sha)
+        imp = PdfImport(project_id=project_id, r2_key=key, file_name=file.filename, sha256=sha)
         db.add(imp)
         db.commit()
         db.refresh(imp)
@@ -144,7 +147,7 @@ async def upload_pdf(
         local_path = local_dir / (file.filename or "upload.pdf")
         local_path.write_bytes(data)
 
-        imp = PdfImport(r2_key=f"local/{file.filename}", file_name=file.filename or "upload.pdf", sha256=sha)
+        imp = PdfImport(project_id=project_id, r2_key=f"local/{file.filename}", file_name=file.filename or "upload.pdf", sha256=sha)
         db.add(imp)
         db.commit()
         db.refresh(imp)
@@ -185,7 +188,7 @@ def _run_local_import(import_id: int, pdf_path: str):
             if result.cover is None:
                 raise ValueError("Cover page not found")
 
-            booth = _upsert_booth(session, result.cover)
+            booth = _upsert_booth(session, result.cover, project_id=imp.project_id)
             session.execute(delete(Voter).where(Voter.booth_id == booth.id))
             session.add_all(
                 Voter(booth_id=booth.id, import_id=imp.id, **asdict(v))

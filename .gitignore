@@ -8,3 +8,10 @@ pdfs/
 *.pdf
 node_modules/
 .next/
+
+# Reference/sample files — do not push
+rbac frontend/
+rbac-sample-api/
+rbac_sample_db/
+new-plan.md
+.vscode/

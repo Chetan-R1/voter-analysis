@@ -16,8 +16,9 @@ BOOTH_FIELDS = (
 )
 
 
-def _upsert_booth(session: Session, cover) -> Booth:
+def _upsert_booth(session: Session, cover, project_id: int | None = None) -> Booth:
     key = dict(
+        project_id=project_id,
         district=cover.district.strip(),
         panchayat_samiti=cover.panchayat_samiti.strip(),
         gram_panchayat=cover.gram_panchayat.strip(),
@@ -46,7 +47,7 @@ def import_pdf(session: Session, imp: PdfImport) -> PdfImport:
         if result.cover is None:
             raise ValueError("cover page not found; is this a ward roll PDF?")
 
-        booth = _upsert_booth(session, result.cover)
+        booth = _upsert_booth(session, result.cover, project_id=imp.project_id)
         # Re-importing a ward replaces its voters (their relationships cascade away and get rebuilt).
         session.execute(delete(Voter).where(Voter.booth_id == booth.id))
         session.add_all(Voter(booth_id=booth.id, import_id=imp.id, **asdict(v)) for v in result.voters)

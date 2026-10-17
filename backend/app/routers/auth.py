@@ -13,6 +13,11 @@ class LoginBody(BaseModel):
     password: str
 
 
+class RegisterBody(BaseModel):
+    email: str
+    password: str
+
+
 @router.post("/login")
 def login(body: LoginBody, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(email=body.email, is_active=True).first()
@@ -28,6 +33,18 @@ def login(body: LoginBody, response: Response, db: Session = Depends(get_db)):
         max_age=60 * 60 * 8,
     )
     return {"ok": True}
+
+
+@router.post("/register", status_code=201)
+def register(body: RegisterBody, db: Session = Depends(get_db), _admin: User = Depends(get_current_user)):
+    if db.query(User).filter_by(email=body.email).first():
+        raise HTTPException(status_code=409, detail="Email already registered")
+    from app.auth import hash_password
+    user = User(email=body.email, password_hash=hash_password(body.password), is_active=True)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return {"id": user.id, "email": user.email}
 
 
 @router.post("/logout")
