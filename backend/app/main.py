@@ -36,6 +36,11 @@ def _run_column_migrations(engine):
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS org_id INTEGER REFERENCES organizations(id) ON DELETE SET NULL",
         # booths: add project_id
         "ALTER TABLE booths ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE",
+        # booths: voter count columns
+        "ALTER TABLE booths ADD COLUMN IF NOT EXISTS total_voter_count INTEGER",
+        "ALTER TABLE booths ADD COLUMN IF NOT EXISTS total_male_voters INTEGER",
+        "ALTER TABLE booths ADD COLUMN IF NOT EXISTS total_female_voters INTEGER",
+        "ALTER TABLE booths ADD COLUMN IF NOT EXISTS total_third_gender_voters INTEGER",
         # pdf_imports: add project_id
         "ALTER TABLE pdf_imports ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL",
         # booths unique constraint: drop old one, add new one with project_id
