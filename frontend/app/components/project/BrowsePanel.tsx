@@ -5,12 +5,14 @@ import type { Booth, WardStats, WardVotersResult } from "@/lib/types";
 import { getWardVoters, getWardStats } from "@/lib/api";
 import VoterTable from "@/app/components/VoterTable";
 import WardStatsCard from "@/app/components/WardStats";
+import { useLang } from "@/app/context/LanguageContext";
 
 interface Props {
   booths: Booth[];
 }
 
 export default function BrowsePanel({ booths }: Props) {
+  const { t } = useLang();
   const [selectedBooth, setSelectedBooth] = useState<number | "">("");
   const [gender, setGender] = useState("");
   const [ageMin, setAgeMin] = useState("");
@@ -50,16 +52,16 @@ export default function BrowsePanel({ booths }: Props) {
       {/* Ward + filters */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
         <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Select Ward</label>
+          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{t.browse.wardLabel}</label>
           <select
             value={selectedBooth}
             onChange={(e) => { setSelectedBooth(e.target.value ? Number(e.target.value) : ""); }}
             className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
           >
-            <option value="">— Choose a ward —</option>
+            <option value="">{t.browse.wardPlaceholder}</option>
             {booths.map((b) => (
               <option key={b.id} value={b.id}>
-                Ward {b.ward_no} · {b.gram_panchayat} ({b.district})
+                {t.browse.wardOption(b.ward_no, b.gram_panchayat, b.district)}
               </option>
             ))}
           </select>
@@ -68,35 +70,35 @@ export default function BrowsePanel({ booths }: Props) {
         {selectedBooth && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Gender</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{t.browse.genderLabel}</label>
               <select value={gender} onChange={(e) => setGender(e.target.value)}
                 className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
-                <option value="">All</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="third">Other</option>
+                <option value="">{t.browse.gAll}</option>
+                <option value="male">{t.browse.gMale}</option>
+                <option value="female">{t.browse.gFemale}</option>
+                <option value="third">{t.browse.gOther}</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Age From</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{t.browse.ageFrom}</label>
               <input type="number" min={18} value={ageMin} onChange={(e) => setAgeMin(e.target.value)}
                 placeholder="18"
                 className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Age To</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{t.browse.ageTo}</label>
               <input type="number" min={18} value={ageMax} onChange={(e) => setAgeMax(e.target.value)}
                 placeholder="100"
                 className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Sort</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{t.browse.sortLabel}</label>
               <select value={sort} onChange={(e) => setSort(e.target.value)}
                 className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
-                <option value="serial">Serial</option>
-                <option value="age_asc">Age ↑</option>
-                <option value="age_desc">Age ↓</option>
-                <option value="name">Name</option>
+                <option value="serial">{t.browse.sSerial}</option>
+                <option value="age_asc">{t.browse.sAgeAsc}</option>
+                <option value="age_desc">{t.browse.sAgeDesc}</option>
+                <option value="name">{t.browse.sName}</option>
               </select>
             </div>
           </div>
@@ -107,16 +109,16 @@ export default function BrowsePanel({ booths }: Props) {
       {loading ? (
         <div className="bg-white rounded-xl border border-slate-200 py-12 flex flex-col items-center gap-3">
           <div className="w-7 h-7 rounded-full border-4 border-slate-200 border-t-indigo-600 animate-spin" />
-          <p className="text-slate-400 text-sm">Loading…</p>
+          <p className="text-slate-400 text-sm">{t.browse.loading}</p>
         </div>
       ) : result ? (
         <div className="space-y-4">
           {stats && (
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "Total", value: result.summary.total, cls: "bg-indigo-50 text-indigo-700 border-indigo-100" },
-                { label: "Male", value: result.summary.male, cls: "bg-sky-50 text-sky-700 border-sky-100" },
-                { label: "Female", value: result.summary.female, cls: "bg-rose-50 text-rose-700 border-rose-100" },
+                { label: t.browse.statTotal, value: result.summary.total, cls: "bg-indigo-50 text-indigo-700 border-indigo-100" },
+                { label: t.browse.statMale, value: result.summary.male, cls: "bg-sky-50 text-sky-700 border-sky-100" },
+                { label: t.browse.statFemale, value: result.summary.female, cls: "bg-rose-50 text-rose-700 border-rose-100" },
               ].map((c) => (
                 <div key={c.label} className={`rounded-xl border px-4 py-3 ${c.cls}`}>
                   <p className="text-2xl font-bold">{c.value}</p>
@@ -133,13 +135,13 @@ export default function BrowsePanel({ booths }: Props) {
               <button disabled={page === 1}
                 onClick={() => loadWard(Number(selectedBooth), page - 1)}
                 className="px-4 py-2 text-sm bg-white border border-slate-200 rounded-lg disabled:opacity-30 hover:border-indigo-300 transition-colors">
-                Prev
+                {t.browse.prev}
               </button>
-              <span className="text-sm text-slate-500">{page} / {result.pages}</span>
+              <span className="text-sm text-slate-500">{t.browse.pageOf(page, result.pages)}</span>
               <button disabled={page === result.pages}
                 onClick={() => loadWard(Number(selectedBooth), page + 1)}
                 className="px-4 py-2 text-sm bg-white border border-slate-200 rounded-lg disabled:opacity-30 hover:border-indigo-300 transition-colors">
-                Next
+                {t.browse.next}
               </button>
             </div>
           )}
@@ -150,7 +152,7 @@ export default function BrowsePanel({ booths }: Props) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
           <p className="text-slate-400 text-sm">
-            {booths.length === 0 ? "No wards imported yet" : "Select a ward to browse voters"}
+            {booths.length === 0 ? t.browse.noWardYet : t.browse.emptyTitle}
           </p>
         </div>
       )}

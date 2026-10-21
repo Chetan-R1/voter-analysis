@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, get_db
-from app.models import Booth, User, Voter
+from app.models import Booth, Project, User, Voter
 
 router = APIRouter(prefix="/booths", tags=["booths"])
 
@@ -19,9 +19,14 @@ def _age_label(lo: int, hi: int) -> str:
 def booth_stats(
     booth_id: int,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    booth = db.query(Booth).get(booth_id)
+    booth = (
+        db.query(Booth)
+        .join(Project, Booth.project_id == Project.id)
+        .filter(Booth.id == booth_id, Project.org_id == user.org_id)
+        .first()
+    )
     if not booth:
         raise HTTPException(status_code=404, detail="Booth not found")
 

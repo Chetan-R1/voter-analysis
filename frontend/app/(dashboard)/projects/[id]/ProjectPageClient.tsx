@@ -9,10 +9,12 @@ import Navbar from "@/app/components/Navbar";
 import ImportPanel from "@/app/components/project/ImportPanel";
 import SearchPanel from "@/app/components/project/SearchPanel";
 import BrowsePanel from "@/app/components/project/BrowsePanel";
+import { useLang } from "@/app/context/LanguageContext";
 
 export default function ProjectPageClient({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const { t } = useLang();
   const projectId = Number(id);
 
   const [email, setEmail] = useState("");
@@ -162,15 +164,15 @@ export default function ProjectPageClient({ params }: { params: Promise<{ id: st
       <div className="max-w-[1400px] mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_1fr] gap-5 items-start">
           <div className="space-y-2">
-            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wide px-0.5">Import PDFs</h2>
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wide px-0.5">{t.tabs.upload}</h2>
             <ImportPanel projectId={projectId} imports={imports} onRefresh={refreshImports} />
           </div>
           <div className="space-y-2">
-            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wide px-0.5">Search Voters</h2>
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wide px-0.5">{t.tabs.search}</h2>
             <SearchPanel />
           </div>
           <div className="space-y-2">
-            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wide px-0.5">Browse by Ward</h2>
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wide px-0.5">{t.tabs.browse}</h2>
             <BrowsePanel booths={booths} />
           </div>
         </div>

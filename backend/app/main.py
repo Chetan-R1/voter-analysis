@@ -84,6 +84,10 @@ def _migrate_existing_data(db):
     # Seed global permissions
     seed_permissions(db)
 
+    # Remove stale booth/project permissions replaced by voter: and import: ones
+    from sqlalchemy import text
+    db.execute(text("DELETE FROM rabc_permissions WHERE code IN ('booth:read','booth:write','project:read','project:write')"))
+
     # Create default org if none exists
     org = db.query(Organization).first()
     if not org:

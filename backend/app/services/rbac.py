@@ -10,15 +10,11 @@ from app.models import (
 )
 
 DEFAULT_PERMISSIONS = [
-    ("Voter Read",    "voter:read",    "voter",   "read",   "View voter records"),
-    ("Voter Write",   "voter:write",   "voter",   "write",  "Edit voter records"),
-    ("Booth Read",    "booth:read",    "booth",   "read",   "View booth/ward data"),
-    ("Booth Write",   "booth:write",   "booth",   "write",  "Edit booth/ward data"),
-    ("Project Read",  "project:read",  "project", "read",   "View projects"),
-    ("Project Write", "project:write", "project", "write",  "Create and edit projects"),
-    ("Import Create", "import:create", "import",  "create", "Upload and import PDFs"),
-    ("Import Read",   "import:read",   "import",  "read",   "View import status"),
-    ("RBAC Manage",   "rbac:manage",   "rbac",    "manage", "Manage roles and permissions"),
+    ("Voter View",    "voter:read",    "voter",   "read",   "Search and view voter records"),
+    ("Import Upload", "import:create", "import",  "create", "Upload PDF voter lists"),
+    ("Import View",   "import:read",   "import",  "read",   "View import history and status"),
+    ("Import Delete", "import:delete", "import",  "delete", "Delete imports"),
+    ("RBAC Manage",   "rbac:manage",   "rbac",    "manage", "Manage roles, users and permissions"),
 ]
 
 
@@ -61,8 +57,8 @@ def assign_default_permissions(db: Session, roles: dict[str, RbacRole]) -> None:
 
     role_perms = {
         "admin":    list(all_perms.keys()),
-        "leader":   ["voter:read", "voter:write", "booth:read", "import:create", "import:read", "project:read"],
-        "karkarta": ["voter:read", "booth:read", "import:read", "project:read"],
+        "leader":   ["voter:read", "import:create", "import:read", "import:delete"],
+        "karkarta": ["voter:read", "import:read"],
     }
 
     for role_code, perm_codes in role_perms.items():

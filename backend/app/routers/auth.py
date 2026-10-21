@@ -40,7 +40,17 @@ def register(body: RegisterBody, db: Session = Depends(get_db), _admin: User = D
     if db.query(User).filter_by(email=body.email).first():
         raise HTTPException(status_code=409, detail="Email already registered")
     from app.auth import hash_password
-    user = User(email=body.email, password_hash=hash_password(body.password), is_active=True)
+    from app.models.rbac import RbacRole, RbacRoleUserJn
+    jn = (
+        db.query(RbacRoleUserJn)
+        .join(RbacRole, RbacRoleUserJn.role_id == RbacRole.id)
+        .filter(RbacRoleUserJn.user_id == _admin.id, RbacRole.org_id == _admin.org_id)
+        .first()
+    )
+    caller_role = jn.role.code if jn else None
+    if caller_role not in ("admin", "leader"):
+        raise HTTPException(status_code=403, detail="Only admins and leaders can create users")
+    user = User(email=body.email, password_hash=hash_password(body.password), is_active=True, org_id=_admin.org_id)
     db.add(user)
     db.commit()
     db.refresh(user)

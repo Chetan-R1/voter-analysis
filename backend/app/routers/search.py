@@ -5,7 +5,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, get_db
-from app.models import Booth, User, Voter
+from app.models import Booth, Project, User, Voter
 
 router = APIRouter(tags=["search"])
 
@@ -46,9 +46,15 @@ def _voter_out(v: Voter) -> dict:
 @router.get("/booths")
 def list_booths(
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    booths = db.query(Booth).order_by(Booth.district, Booth.gram_panchayat, Booth.ward_no).all()
+    booths = (
+        db.query(Booth)
+        .join(Project, Booth.project_id == Project.id)
+        .filter(Project.org_id == user.org_id)
+        .order_by(Booth.district, Booth.gram_panchayat, Booth.ward_no)
+        .all()
+    )
     return [_booth_out(b) for b in booths]
 
 
@@ -64,9 +70,14 @@ def search_voters(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, le=200),
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    qry = db.query(Voter).filter(Voter.status == "active")
+    qry = (
+        db.query(Voter)
+        .join(Booth, Voter.booth_id == Booth.id)
+        .join(Project, Booth.project_id == Project.id)
+        .filter(Voter.status == "active", Project.org_id == user.org_id)
+    )
 
     # Text search — name (Hindi), name_en, relative_name, EPIC
     q = q.strip()
@@ -124,11 +135,16 @@ def ward_voters(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, le=200),
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    booth = db.get(Booth, booth_id)
+    from fastapi import HTTPException
+    booth = (
+        db.query(Booth)
+        .join(Project, Booth.project_id == Project.id)
+        .filter(Booth.id == booth_id, Project.org_id == user.org_id)
+        .first()
+    )
     if not booth:
-        from fastapi import HTTPException
         raise HTTPException(404, "Ward not found")
 
     qry = db.query(Voter).filter(Voter.booth_id == booth_id, Voter.status == "active")

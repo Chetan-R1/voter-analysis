@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, get_db
-from app.models import Booth, User, Voter
+from app.models import Booth, Project, User, Voter
 
 router = APIRouter(prefix="/voters", tags=["voters"])
 
@@ -43,11 +43,13 @@ def _voter_out(v: Voter) -> dict:
 def get_voter(
     epic_no: str,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
     voter = (
         db.query(Voter)
-        .filter(Voter.epic_no == epic_no.upper(), Voter.status == "active")
+        .join(Booth, Voter.booth_id == Booth.id)
+        .join(Project, Booth.project_id == Project.id)
+        .filter(Voter.epic_no == epic_no.upper(), Voter.status == "active", Project.org_id == user.org_id)
         .first()
     )
     if not voter:
@@ -90,9 +92,15 @@ def _infer_housemate_relation(voter: Voter, other: Voter) -> str:
 def get_voter_family(
     voter_id: int,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    voter = db.query(Voter).filter(Voter.id == voter_id, Voter.status == "active").first()
+    voter = (
+        db.query(Voter)
+        .join(Booth, Voter.booth_id == Booth.id)
+        .join(Project, Booth.project_id == Project.id)
+        .filter(Voter.id == voter_id, Voter.status == "active", Project.org_id == user.org_id)
+        .first()
+    )
     if not voter:
         raise HTTPException(status_code=404, detail="Voter not found")
 

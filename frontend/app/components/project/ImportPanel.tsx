@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import type { ImportRecord } from "@/lib/types";
 import { presignUpload, registerUpload, uploadPdf, retryImport, deleteImport } from "@/lib/api";
+import { useLang } from "@/app/context/LanguageContext";
 
 const STATUS_COLOR: Record<string, string> = {
   uploaded: "text-slate-400", processing: "text-amber-500",
@@ -12,10 +13,6 @@ const STATUS_DOT: Record<string, string> = {
   uploaded: "bg-slate-300", processing: "bg-amber-400 animate-pulse",
   done: "bg-emerald-500", review: "bg-orange-400", failed: "bg-red-500",
 };
-const STATUS_LABEL: Record<string, string> = {
-  uploaded: "Queued", processing: "Processing", done: "Done",
-  review: "Review", failed: "Failed",
-};
 
 interface Props {
   projectId: number;
@@ -24,6 +21,7 @@ interface Props {
 }
 
 export default function ImportPanel({ projectId, imports, onRefresh }: Props) {
+  const { t } = useLang();
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -31,7 +29,7 @@ export default function ImportPanel({ projectId, imports, onRefresh }: Props) {
 
   async function handleFiles(files: FileList | File[]) {
     const pdfs = Array.from(files).filter((f) => f.name.toLowerCase().endsWith(".pdf"));
-    if (!pdfs.length) { addMsg("Only PDF files are allowed", false); return; }
+    if (!pdfs.length) { addMsg(t.upload.pdfOnly, false); return; }
     setUploading(true);
     for (const file of pdfs) {
       try {
@@ -43,10 +41,10 @@ export default function ImportPanel({ projectId, imports, onRefresh }: Props) {
           });
           if (!r2res.ok) throw new Error(`R2 upload failed: ${r2res.status}`);
           const reg = await registerUpload(presign.key, file.name, projectId);
-          addMsg(reg.skipped ? `${file.name} already imported` : `${file.name} — upload started`, true);
+          addMsg(reg.skipped ? t.upload.alreadyImported(file.name) : t.upload.uploadOk(file.name), true);
         } else {
           const res = await uploadPdf(projectId, file);
-          addMsg(res.skipped ? `${file.name} already imported` : `${file.name} — upload started`, true);
+          addMsg(res.skipped ? t.upload.alreadyImported(file.name) : t.upload.uploadOk(file.name), true);
         }
       } catch (e: any) {
         addMsg(`${file.name} — ${e?.response?.data?.detail ?? e?.message ?? "upload failed"}`, false);
@@ -80,14 +78,14 @@ export default function ImportPanel({ projectId, imports, onRefresh }: Props) {
         {uploading ? (
           <div className="flex flex-col items-center gap-2">
             <div className="w-7 h-7 rounded-full border-3 border-indigo-200 border-t-indigo-600 animate-spin" />
-            <p className="text-xs text-indigo-600 font-medium">Uploading…</p>
+            <p className="text-xs text-indigo-600 font-medium">{t.upload.uploading}</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1.5">
             <svg className="w-7 h-7 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <p className="text-xs font-semibold text-slate-500">Drop PDF or click to upload</p>
+            <p className="text-xs font-semibold text-slate-500">{t.upload.dropTitle}</p>
           </div>
         )}
       </div>
@@ -104,16 +102,16 @@ export default function ImportPanel({ projectId, imports, onRefresh }: Props) {
       {/* Import list */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Imports</span>
+          <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{t.upload.historyTitle}</span>
           {processingCount > 0 && (
             <span className="text-xs text-amber-500 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block" />
-              {processingCount} processing
+              {t.upload.processingN(processingCount)}
             </span>
           )}
         </div>
         {imports.length === 0 ? (
-          <p className="text-xs text-slate-400 text-center py-6">No imports yet</p>
+          <p className="text-xs text-slate-400 text-center py-6">{t.upload.noImports}</p>
         ) : (
           <ul className="divide-y divide-slate-50">
             {imports.map((imp) => (
@@ -122,7 +120,7 @@ export default function ImportPanel({ projectId, imports, onRefresh }: Props) {
                   <p className="text-xs font-medium text-slate-700 truncate max-w-[140px]">{imp.file_name}</p>
                   <div className={`flex items-center gap-1 text-xs font-medium shrink-0 ${STATUS_COLOR[imp.status]}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[imp.status]}`} />
-                    {STATUS_LABEL[imp.status]}
+                    {(t.upload as any)[`status${imp.status.charAt(0).toUpperCase() + imp.status.slice(1)}`] ?? imp.status}
                   </div>
                 </div>
                 {imp.total_voters != null && (

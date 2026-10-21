@@ -6,10 +6,12 @@ import { searchVoterByEpic, searchVoters, getFamily, getWardStats } from "@/lib/
 import VoterCard from "@/app/components/VoterCard";
 import RelationshipTree from "@/app/components/RelationshipTree";
 import WardStatsCard from "@/app/components/WardStats";
+import { useLang } from "@/app/context/LanguageContext";
 
 type DetailTab = "voter" | "family" | "ward";
 
 export default function SearchPanel() {
+  const { t } = useLang();
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
@@ -32,11 +34,11 @@ export default function SearchPanel() {
         setRelations(rels); setWardStats(stats);
       } else {
         const res = await searchVoters({ q: trimmed, page_size: 50 });
-        if (res.total === 0) setError(`No voter found for "${trimmed}"`);
+        if (res.total === 0) setError(t.search.notFound(trimmed));
         else setResults(res);
       }
     } catch {
-      setError("Search failed. Please try again.");
+      setError(t.search.failed);
     } finally {
       setSearching(false);
     }
@@ -64,7 +66,7 @@ export default function SearchPanel() {
           </svg>
           <input
             type="text" value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, EPIC or relative name…"
+            placeholder={t.search.placeholder}
             className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
           />
         </div>
@@ -74,7 +76,7 @@ export default function SearchPanel() {
         >
           {searching
             ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            : "Search"}
+            : t.search.searchBtn}
         </button>
       </form>
 
@@ -122,14 +124,14 @@ export default function SearchPanel() {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back
+            {t.search.back}
           </button>
           <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
             {(["voter", "family", "ward"] as DetailTab[]).map((tab) => (
               <button key={tab} onClick={() => setDetailTab(tab)}
                 className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all capitalize
                   ${detailTab === tab ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-                {tab === "family" ? `Family (${relations.length})` : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === "family" ? t.search.tabFamily(relations.length) : tab === "voter" ? t.search.tabVoter : t.search.tabWard}
               </button>
             ))}
           </div>
@@ -144,7 +146,8 @@ export default function SearchPanel() {
           <svg className="w-8 h-8 text-slate-200 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <p className="text-slate-400 text-sm">Search by name, EPIC, or relative name</p>
+          <p className="text-slate-400 text-sm">{t.search.emptyTitle}</p>
+          <p className="text-slate-300 text-xs mt-1">{t.search.emptyHint}</p>
         </div>
       )}
     </div>

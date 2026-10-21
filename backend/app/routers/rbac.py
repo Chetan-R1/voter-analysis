@@ -17,7 +17,27 @@ from app.schemas.rbac import (
 from app.services import rbac as svc
 from app.services import organization as org_svc
 
-router = APIRouter(prefix="/organizations/{org_id}/rbac", tags=["rbac"])
+def _require_org(org_id: int, user: User = Depends(get_current_user)):
+    if user.org_id != org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _caller_role_code(db: Session, user_id: int, org_id: int) -> str | None:
+    from app.models import RbacRole, RbacRoleUserJn
+    jn = (
+        db.query(RbacRoleUserJn)
+        .join(RbacRole, RbacRoleUserJn.role_id == RbacRole.id)
+        .filter(RbacRoleUserJn.user_id == user_id, RbacRole.org_id == org_id)
+        .first()
+    )
+    return jn.role.code if jn else None
+
+
+router = APIRouter(
+    prefix="/organizations/{org_id}/rbac",
+    tags=["rbac"],
+    dependencies=[Depends(_require_org)],
+)
 me_router = APIRouter(tags=["me"])
 
 
@@ -201,6 +221,13 @@ def assign_role_to_user(
     role = db.get(RbacRole, body.role_id)
     if not role or role.org_id != org_id:
         raise HTTPException(status_code=404, detail="Role not found in this organization")
+    if role.code == "admin":
+        raise HTTPException(status_code=403, detail="Admin role cannot be assigned via API")
+    caller_role = _caller_role_code(db, _user.id, org_id)
+    if caller_role not in ("admin", "leader"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions to assign roles")
+    if caller_role == "leader" and role.code != "karyakarta":
+        raise HTTPException(status_code=403, detail="Leaders can only assign karyakarta role")
     # Remove existing roles first (one role per user per org)
     from app.models import RbacRoleUserJn
     existing_jns = (
@@ -224,6 +251,15 @@ def remove_role_from_user(
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
 ):
+    from app.models import RbacRole
+    role = db.get(RbacRole, role_id)
+    if role and role.code == "admin":
+        raise HTTPException(status_code=403, detail="Admin role cannot be removed via API")
+    caller_role = _caller_role_code(db, _user.id, org_id)
+    if caller_role not in ("admin", "leader"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions to remove roles")
+    if caller_role == "leader" and role and role.code != "karyakarta":
+        raise HTTPException(status_code=403, detail="Leaders can only remove karyakarta role")
     if not svc.remove_role_from_user(db, user_id, role_id):
         raise HTTPException(status_code=404, detail="Assignment not found")
 
